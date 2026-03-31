@@ -331,6 +331,13 @@ class BaseManagerWindow(ctk.CTkToplevel):
             messagebox.showwarning("Duplicado", f"O {self.item_name_singular} '{new_name}' já existe.", parent=self)
             return
         
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
+>>>>>>> 795fb82d750116ca91c2c0386a07652fb251b7f4
         success, error_message = self.add_func(new_name)
         if success:
             self.master.update_status(f"{self.item_name_singular.capitalize()} '{new_name}' adicionado com sucesso.")
@@ -338,6 +345,21 @@ class BaseManagerWindow(ctk.CTkToplevel):
             messagebox.showerror("Erro ao Adicionar", f"Não foi possível adicionar o {self.item_name_singular}.\n\nMotivo: {error_message}", parent=self)
         self.load_and_display_items()
         self.refresh_master_func()
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+=======
+        success = self.add_func(new_name)
+        if success:
+            self.master.update_status(f"{self.item_name_singular.capitalize()} '{new_name}' adicionado com sucesso.")
+        else:
+            messagebox.showerror("Erro", f"Não foi possível adicionar o {self.item_name_singular} '{new_name}'.\nVerifique o console para mais detalhes.", parent=self)
+        self.load_and_display_items()
+        self.refresh_master_func() # Chama a função de atualização da janela principal
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
+>>>>>>> 795fb82d750116ca91c2c0386a07652fb251b7f4
         self.new_item_entry.delete(0, 'end')
 
     def edit_item(self, old_name):
@@ -348,9 +370,27 @@ class BaseManagerWindow(ctk.CTkToplevel):
         if clean_new_name in self.get_all_func():
             messagebox.showwarning("Duplicado", f"O nome '{clean_new_name}' já existe.", parent=self)
             return
+<<<<<<< HEAD
         success, error_message = self.update_func(old_name, clean_new_name)
         if not success:
             messagebox.showerror("Erro ao Atualizar", f"Não foi possível atualizar o {self.item_name_singular}.\n\nMotivo: {error_message}", parent=self)
+=======
+<<<<<<< HEAD
+        success, error_message = self.update_func(old_name, clean_new_name)
+        if not success:
+            messagebox.showerror("Erro ao Atualizar", f"Não foi possível atualizar o {self.item_name_singular}.\n\nMotivo: {error_message}", parent=self)
+=======
+<<<<<<< HEAD
+        success, error_message = self.update_func(old_name, clean_new_name)
+        if not success:
+            messagebox.showerror("Erro ao Atualizar", f"Não foi possível atualizar o {self.item_name_singular}.\n\nMotivo: {error_message}", parent=self)
+=======
+        success = self.update_func(old_name, clean_new_name)
+        if not success:
+            messagebox.showerror("Erro", f"Não foi possível atualizar o {self.item_name_singular} '{old_name}'.\nVerifique o console para mais detalhes.", parent=self)
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
+>>>>>>> 795fb82d750116ca91c2c0386a07652fb251b7f4
             return
         self.load_and_display_items()
         self.refresh_master_func()
@@ -358,11 +398,31 @@ class BaseManagerWindow(ctk.CTkToplevel):
 
     def delete_item(self, name_to_delete):
         if messagebox.askyesno("Confirmar Exclusão", f"Tem certeza que deseja excluir o {self.item_name_singular} '{name_to_delete}'?", parent=self):
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
+>>>>>>> 795fb82d750116ca91c2c0386a07652fb251b7f4
             success, error_message = self.delete_func(name_to_delete)
             if success:
                 self.master.update_status(f"{self.item_name_singular.capitalize()} '{name_to_delete}' excluído com sucesso.")
             else:
                 messagebox.showerror("Erro ao Excluir", f"Não foi possível excluir o {self.item_name_singular} '{name_to_delete}'.\n\nMotivo: {error_message}", parent=self)
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+=======
+            success = self.delete_func(name_to_delete)
+            if success:
+                self.master.update_status(f"{self.item_name_singular.capitalize()} '{name_to_delete}' excluído com sucesso.")
+            else:
+                messagebox.showerror("Erro", f"Não foi possível excluir o {self.item_name_singular} '{name_to_delete}'.\nVerifique se não há entradas de estoque associadas a ele ou o console para mais detalhes.", parent=self)
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
+>>>>>>> 795fb82d750116ca91c2c0386a07652fb251b7f4
             self.load_and_display_items()
             self.refresh_master_func()
 
