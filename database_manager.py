@@ -44,67 +44,63 @@ class DatabaseManager:
         """Verifica e cria as tabelas do sistema se elas não existirem."""
         if not self._check_connection():
             return False, "Conexão com o banco de dados não estabelecida."
-        cursor = self.connection.cursor()
         try:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS products (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS conferentes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS stock_entries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    entry_datetime TIMESTAMP NOT NULL,
-                    conferente_id INT NOT NULL,
-                    product_id INT NOT NULL,
-                    quantity INT NOT NULL,
-                    FOREIGN KEY (conferente_id) REFERENCES conferentes(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-                    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT ON UPDATE CASCADE
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS app_settings (
-                    setting_name TEXT PRIMARY KEY,
-                    setting_value TEXT
-                );
-            """)
-            self.connection.commit() # Commita as criações de tabela
+            with self.connection:
+                cursor = self.connection.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS products (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE NOT NULL
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS conferentes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE NOT NULL
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS stock_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        entry_datetime TIMESTAMP NOT NULL,
+                        conferente_id INT NOT NULL,
+                        product_id INT NOT NULL,
+                        quantity INT NOT NULL,
+                        FOREIGN KEY (conferente_id) REFERENCES conferentes(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+                        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT ON UPDATE CASCADE
+                    );
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS app_settings (
+                        setting_name TEXT PRIMARY KEY,
+                        setting_value TEXT
+                    );
+                """)
             print("Tabelas do sistema verificadas/criadas com sucesso.")
             return True, None
         except sqlite3.Error as e:
             error_msg = f"Erro ao criar tabelas: {e}"
             print(error_msg)
-            self.connection.rollback()
             return False, error_msg
-        finally:
-            cursor.close()
 
     def execute_query(self, query, params=None, fetch=False):
         if not self._check_connection():
             return False, "Conexão com o banco de dados perdida. Por favor, reinicie o aplicativo."
 
-        cursor = self.connection.cursor()
         try:
-            cursor.execute(query, params)
-            if fetch:
-                result = cursor.fetchall()
-                return True, result
-            else:
-                self.connection.commit()
-                # Para INSERT, lastrowid indica se uma nova linha foi realmente inserida
-                # (ou None se não, como em INSERT IGNORE para duplicatas).
-                return True, (cursor.lastrowid if "INSERT" in query.upper() else None)
+            with self.connection:
+                cursor = self.connection.cursor()
+                cursor.execute(query, params or ())
+                if fetch:
+                    result = cursor.fetchall()
+                    return True, result
+                else:
+                    # Para INSERT, lastrowid indica se uma nova linha foi realmente inserida
+                    # (ou None se não, como em INSERT IGNORE para duplicatas).
+                    return True, (cursor.lastrowid if "INSERT" in query.upper() else None)
         except sqlite3.Error as e:
             error_str = str(e)
             print(f"Erro ao executar query: {error_str}")
-            self.connection.rollback()
             # Tenta traduzir erros comuns do SQLite para mensagens mais amigáveis
             if "UNIQUE constraint failed" in error_str:
                 failed_field = error_str.split(': ')[-1]
@@ -114,8 +110,6 @@ class DatabaseManager:
             if "NOT NULL constraint failed" in error_str:
                 return False, f"Um campo obrigatório não foi preenchido: {error_str.split(': ')[-1]}."
             return False, error_str # Retorna o erro original se não for um dos casos conhecidos
-        finally:
-            cursor.close()
 
     # --- Métodos para Produtos ---
     def get_all_products(self):
@@ -181,31 +175,28 @@ class DatabaseManager:
         if not self._check_connection():
             return False, "Conexão com o banco de dados perdida. Por favor, reinicie o aplicativo."
 
-        cursor = self.connection.cursor()
         try:
-            query = "INSERT INTO stock_entries (entry_datetime, conferente_id, product_id, quantity) VALUES (?, ?, ?, ?)"
+            with self.connection:
+                cursor = self.connection.cursor()
+                query = "INSERT INTO stock_entries (entry_datetime, conferente_id, product_id, quantity) VALUES (?, ?, ?, ?)"
 
-            for entry in entries:
-                conferente_id = self.get_conferente_id(entry['conferente_name'])
-                product_id = self.get_product_id(entry['product_name'])
+                for entry in entries:
+                    conferente_id = self.get_conferente_id(entry['conferente_name'])
+                    product_id = self.get_product_id(entry['product_name'])
 
-                if conferente_id is None:
-                    raise ValueError(f"Conferente '{entry['conferente_name']}' não encontrado.")
-                if product_id is None:
-                    raise ValueError(f"Produto '{entry['product_name']}' não encontrado.")
+                    if conferente_id is None:
+                        raise ValueError(f"Conferente '{entry['conferente_name']}' não encontrado.")
+                    if product_id is None:
+                        raise ValueError(f"Produto '{entry['product_name']}' não encontrado.")
 
-                params = (entry['entry_datetime'], conferente_id, product_id, entry['quantity'])
-                cursor.execute(query, params)
+                    params = (entry['entry_datetime'], conferente_id, product_id, entry['quantity'])
+                    cursor.execute(query, params)
 
-            self.connection.commit()
             return True, None
         except (sqlite3.Error, ValueError) as e:
             error_msg = f"Erro ao adicionar múltiplas entradas de estoque: {e}"
             print(error_msg)
-            self.connection.rollback()
             return False, str(e)
-        finally:
-            cursor.close()
 
     def upsert_multiple_stock_entries(self, entries):
         """
@@ -218,42 +209,39 @@ class DatabaseManager:
         if not self._check_connection():
             return False, "Conexão com o banco de dados perdida. Por favor, reinicie o aplicativo."
 
-        cursor = self.connection.cursor()
         try:
-            for entry in entries:
-                conferente_id = self.get_conferente_id(entry['conferente_name'])
-                product_id = self.get_product_id(entry['product_name'])
-                entry_date = entry['entry_datetime'].date()
+            with self.connection:
+                cursor = self.connection.cursor()
+                for entry in entries:
+                    conferente_id = self.get_conferente_id(entry['conferente_name'])
+                    product_id = self.get_product_id(entry['product_name'])
+                    entry_date = entry['entry_datetime'].date()
 
-                if conferente_id is None:
-                    raise ValueError(f"Conferente '{entry['conferente_name']}' não encontrado.")
-                if product_id is None:
-                    raise ValueError(f"Produto '{entry['product_name']}' não encontrado.")
+                    if conferente_id is None:
+                        raise ValueError(f"Conferente '{entry['conferente_name']}' não encontrado.")
+                    if product_id is None:
+                        raise ValueError(f"Produto '{entry['product_name']}' não encontrado.")
 
-                # Verifica se já existe um registro para o mesmo dia, conferente e produto
-                find_query = "SELECT id FROM stock_entries WHERE conferente_id = ? AND product_id = ? AND DATE(entry_datetime) = ?"
-                cursor.execute(find_query, (conferente_id, product_id, entry_date))
-                existing_entry = cursor.fetchone()
+                    # Verifica se já existe um registro para o mesmo dia, conferente e produto
+                    find_query = "SELECT id FROM stock_entries WHERE conferente_id = ? AND product_id = ? AND DATE(entry_datetime) = ?"
+                    cursor.execute(find_query, (conferente_id, product_id, entry_date))
+                    existing_entry = cursor.fetchone()
 
-                if existing_entry:
-                    # Atualiza o registro existente
-                    existing_entry_id = existing_entry[0]
-                    update_query = "UPDATE stock_entries SET quantity = ?, entry_datetime = ? WHERE id = ?"
-                    cursor.execute(update_query, (entry['quantity'], entry['entry_datetime'], existing_entry_id))
-                else:
-                    # Insere um novo registro
-                    insert_query = "INSERT INTO stock_entries (entry_datetime, conferente_id, product_id, quantity) VALUES (?, ?, ?, ?)"
-                    cursor.execute(insert_query, (entry['entry_datetime'], conferente_id, product_id, entry['quantity']))
+                    if existing_entry:
+                        # Atualiza o registro existente
+                        existing_entry_id = existing_entry[0]
+                        update_query = "UPDATE stock_entries SET quantity = ?, entry_datetime = ? WHERE id = ?"
+                        cursor.execute(update_query, (entry['quantity'], entry['entry_datetime'], existing_entry_id))
+                    else:
+                        # Insere um novo registro
+                        insert_query = "INSERT INTO stock_entries (entry_datetime, conferente_id, product_id, quantity) VALUES (?, ?, ?, ?)"
+                        cursor.execute(insert_query, (entry['entry_datetime'], conferente_id, product_id, entry['quantity']))
 
-            self.connection.commit()
             return True, None
         except (sqlite3.Error, ValueError) as e:
             error_msg = f"Erro ao adicionar/atualizar múltiplas entradas de estoque: {e}"
             print(error_msg)
-            self.connection.rollback()
             return False, str(e)
-        finally:
-            cursor.close()
 
     def get_stock_entries(self, date_filter=None, conferente_filter=None, product_filter=None):
         query = """

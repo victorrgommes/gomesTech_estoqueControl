@@ -1,12 +1,12 @@
 import customtkinter as ctk
 import pandas as pd
-from openpyxl import load_workbook
-from openpyxl.styles import PatternFill, Font, Alignment
-from openpyxl.utils import get_column_letter
 import os
 import datetime
-from tkinter import messagebox, ttk, filedialog
+from tkinter import filedialog
+from CTkMessagebox import CTkMessagebox
+from CTkTable import CTkTable
 from database_manager import DatabaseManager
+from export_manager import ExportManager
 
 # --- Classes de Janelas Secundárias ---
 
@@ -62,50 +62,22 @@ class SearchWindow(ctk.CTkToplevel):
         results_frame.grid(row=1, column=0, pady=(0, 10), padx=10, sticky="nsew")
         results_frame.grid_rowconfigure(0, weight=1)
         results_frame.grid_columnconfigure(0, weight=1)
-
-        # Define constantes para as cores da Treeview
-        TREEVIEW_BG = "#2b2b2b"
-        TREEVIEW_FG = "white"
-        TREEVIEW_FIELD_BG = "#2b2b2b"
-        TREEVIEW_BORDER_COLOR = "#333333"
-        TREEVIEW_SELECTED_BG = "#22559b"
-        TREEVIEW_HEADING_BG = "#565b5e"
-        TREEVIEW_HEADING_FG = "white"
-        TREEVIEW_HEADING_ACTIVE_BG = "#3484de"
-
-        style = ttk.Style(self)
-        style.theme_use("default")
-        style.configure("Treeview", background=TREEVIEW_BG, foreground=TREEVIEW_FG, rowheight=25, fieldbackground=TREEVIEW_FIELD_BG, bordercolor=TREEVIEW_BORDER_COLOR, borderwidth=0)
-        style.map('Treeview', background=[('selected', TREEVIEW_SELECTED_BG)])
-        style.configure("Treeview.Heading", background=TREEVIEW_HEADING_BG, foreground=TREEVIEW_HEADING_FG, relief="flat", font=('Arial', 10, 'bold'))
-        style.map("Treeview.Heading", background=[('active', TREEVIEW_HEADING_ACTIVE_BG)])
         
-        self.tree = ttk.Treeview(results_frame, columns=('ID', 'Data/Hora', 'Conferente', 'Produto', 'Quantidade'), show='headings')
-        
-        self.tree.heading('Data/Hora', text='Data/Hora')
-        self.tree.heading('Conferente', text='Conferente')
-        self.tree.heading('Produto', text='Produto')
+        self.table_frame = ctk.CTkScrollableFrame(results_frame)
+        self.table_frame.grid(row=0, column=0, sticky="nsew")
 
-        self.tree.column('ID', width=0, stretch=False)
-        self.tree.column('Data/Hora', width=150, anchor='center')
-        self.tree.column('Conferente', width=150, anchor='center')
-        self.tree.column('Produto', width=200, anchor='w')
-        self.tree.column('Quantidade', width=100, anchor='center')
-
-        self.tree.grid(row=0, column=0, sticky="nsew")
-
-        scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.grid(row=0, column=1, sticky="ns")
-
-        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        self.table_values = [["ID", "Data/Hora", "Conferente", "Produto", "Quantidade"]]
+        self.table = CTkTable(master=self.table_frame, values=self.table_values, command=self.on_table_click)
+        self.table.pack(expand=True, fill="both")
+        self.selected_row = None
 
     def _clear_search_results(self):
-        """Limpa os resultados da Treeview e desabilita o botão de edição."""
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        """Limpa os resultados da Tabela e desabilita o botão de edição."""
+        self.table_values = [["ID", "Data/Hora", "Conferente", "Produto", "Quantidade"]]
+        self.table.update_values(self.table_values)
         self.edit_button.configure(state="disabled")
         self.last_search_results = []
+        self.selected_row = None
     def load_filter_options(self):
         db_manager = self.master.db_manager
         conferentes = [""] + sorted(db_manager.get_all_conferentes())
@@ -138,7 +110,7 @@ class SearchWindow(ctk.CTkToplevel):
                 try:
                     search_date_obj = datetime.datetime.strptime(date_str, "%d/%m/%Y").date()
                 except ValueError:
-                    messagebox.showerror("Formato Inválido", "Por favor, insira a data no formato dd/mm/aaaa.", parent=self)
+                    CTkMessagebox(title="Formato Inválido", message="Por favor, insira a data no formato dd/mm/aaaa.", icon="warning")
                     return
             
             results = db_manager.get_stock_entries(
@@ -149,31 +121,31 @@ class SearchWindow(ctk.CTkToplevel):
 
             if not results:
                 self.last_search_results = []
-                messagebox.showinfo("Nenhum Resultado", "Nenhum registro encontrado com os filtros aplicados.", parent=self)
+                CTkMessagebox(title="Nenhum Resultado", message="Nenhum registro encontrado com os filtros aplicados.", icon="info")
                 return
             
             for row in results:
                 dt_str = row['entry_datetime'].strftime('%d/%m/%Y %H:%M:%S')
-                self.tree.insert('', 'end', values=(row['id'], dt_str, row['conferente_name'], row['product_name'], row['quantity']))
+                self.table_values.append([row['id'], dt_str, row['conferente_name'], row['product_name'], str(row['quantity'])])
+            self.table.update_values(self.table_values)
             self.last_search_results = results
 
         except Exception as e:
-            messagebox.showerror("Erro ao Consultar Banco de Dados", f"Ocorreu um erro ao consultar o histórico:\n{e}", parent=self)
+            CTkMessagebox(title="Erro ao Consultar", message=f"Ocorreu um erro ao consultar o histórico:\n{e}", icon="error")
 
-    def on_tree_select(self, event):
-        if len(self.tree.selection()) == 1:
+    def on_table_click(self, cell):
+        if cell["row"] > 0: # Ignorar cabeçalho
+            self.selected_row = cell["row"]
             self.edit_button.configure(state="normal")
         else:
+            self.selected_row = None
             self.edit_button.configure(state="disabled")
 
     def edit_quantity(self):
-        selected_items = self.tree.selection()
-        if not selected_items:
+        if not self.selected_row:
             return
         
-        selected_item = selected_items[0]
-        item_values = self.tree.item(selected_item, 'values')
-        
+        item_values = self.table_values[self.selected_row]
         entry_id_str, timestamp_str, conferente, produto, old_quantity = item_values
 
         dialog = ctk.CTkInputDialog(text=f"Produto: {produto}\nConferente: {conferente}\n\nDigite a nova quantidade (atual: {old_quantity}):", title="Editar Quantidade")
@@ -183,26 +155,25 @@ class SearchWindow(ctk.CTkToplevel):
             return
         
         if not new_quantity_str.strip().isdigit():
-            messagebox.showwarning("Entrada Inválida", "Por favor, insira apenas números inteiros para a quantidade.", parent=self)
+            CTkMessagebox(title="Entrada Inválida", message="Por favor, insira apenas números inteiros para a quantidade.", icon="warning")
             return
         if int(new_quantity_str.strip()) < 0:
-            messagebox.showwarning("Entrada Inválida", "A quantidade não pode ser negativa.", parent=self)
+            CTkMessagebox(title="Entrada Inválida", message="A quantidade não pode ser negativa.", icon="warning")
             return
         new_quantity = int(new_quantity_str)
 
-        # Usa o ID para uma atualização segura e precisa
         success, error_message = self.master.db_manager.update_stock_entry_quantity(int(entry_id_str), new_quantity)
         if not success:
-            messagebox.showerror("Erro de Atualização", f"Não foi possível atualizar a quantidade no banco de dados:\n{error_message}", parent=self)
+            CTkMessagebox(title="Erro de Atualização", message=f"Não foi possível atualizar a quantidade no banco de dados:\n{error_message}", icon="error")
             return
 
-        new_values = (entry_id_str, timestamp_str, conferente, produto, str(new_quantity))
-        self.tree.item(selected_item, values=new_values)
-        messagebox.showinfo("Sucesso", "A quantidade foi atualizada com sucesso.", parent=self)
+        self.table_values[self.selected_row] = [entry_id_str, timestamp_str, conferente, produto, str(new_quantity)]
+        self.table.update_values(self.table_values)
+        CTkMessagebox(title="Sucesso", message="A quantidade foi atualizada com sucesso.", icon="check")
 
     def export_filtered_data(self):
         if not self.last_search_results:
-            messagebox.showwarning("Exportar Dados", "Não há dados para exportar. Realize uma busca primeiro.", parent=self)
+            CTkMessagebox(title="Exportar Dados", message="Não há dados para exportar. Realize uma busca primeiro.", icon="warning")
             return
 
         df = pd.DataFrame([dict(row) for row in self.last_search_results])
@@ -224,44 +195,11 @@ class SearchWindow(ctk.CTkToplevel):
 
         if file_path:
             try:
-                writer = pd.ExcelWriter(file_path, engine='openpyxl')
-                df.to_excel(writer, index=False, sheet_name='HistoricoEstoque')
-                workbook = writer.book
-                worksheet = writer.sheets['HistoricoEstoque']
-
-                self._apply_excel_formatting(workbook, worksheet)
-
-                writer.close()
-                messagebox.showinfo("Exportação Concluída", f"Dados exportados com sucesso para:\n{file_path}", parent=self)
+                # Usar o gerenciador MVC criado
+                ExportManager.export_to_excel(df, file_path)
+                CTkMessagebox(title="Exportação Concluída", message=f"Dados exportados com sucesso para:\n{file_path}", icon="check")
             except Exception as e:
-                messagebox.showerror("Erro de Exportação", f"Ocorreu um erro ao exportar para Excel:\n{e}", parent=self)
-
-    def _apply_excel_formatting(self, workbook, worksheet):
-        # Define constantes para as cores do cabeçalho do Excel
-        HEADER_FILL_COLOR = "00008B" # Azul escuro
-        HEADER_FONT_COLOR = "FFFFFF" # Branco
-        header_fill = PatternFill(start_color=HEADER_FILL_COLOR, end_color=HEADER_FILL_COLOR, fill_type="solid")
-        header_font = Font(color=HEADER_FONT_COLOR, bold=True)
-
-        for col_num, cell in enumerate(worksheet[1], 1):
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-
-        for column_cells in worksheet.columns:
-            max_length = 0
-            column_letter = get_column_letter(column_cells[0].column)
-            for cell in column_cells:
-                try:
-                    if cell.value is not None and len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = (max_length + 2)
-            worksheet.column_dimensions[column_letter].width = adjusted_width
-
-            for cell in column_cells:
-                cell.alignment = Alignment(horizontal='center', vertical='center')
+                CTkMessagebox(title="Erro de Exportação", message=f"Ocorreu um erro ao exportar para Excel:\n{e}", icon="error")
 
 
 class BaseManagerWindow(ctk.CTkToplevel):
@@ -328,14 +266,14 @@ class BaseManagerWindow(ctk.CTkToplevel):
         if not new_name: return
         
         if new_name in self.get_all_func():
-            messagebox.showwarning("Duplicado", f"O {self.item_name_singular} '{new_name}' já existe.", parent=self)
+            CTkMessagebox(title="Duplicado", message=f"O {self.item_name_singular} '{new_name}' já existe.", icon="warning")
             return
         
         success, error_message = self.add_func(new_name)
         if success:
             self.master.update_status(f"{self.item_name_singular.capitalize()} '{new_name}' adicionado com sucesso.")
         else:
-            messagebox.showerror("Erro ao Adicionar", f"Não foi possível adicionar o {self.item_name_singular}.\n\nMotivo: {error_message}", parent=self)
+            CTkMessagebox(title="Erro ao Adicionar", message=f"Não foi possível adicionar o {self.item_name_singular}.\n\nMotivo: {error_message}", icon="error")
         self.load_and_display_items()
         self.refresh_master_func()
         self.new_item_entry.delete(0, 'end')
@@ -346,23 +284,24 @@ class BaseManagerWindow(ctk.CTkToplevel):
         if not new_name_input or not new_name_input.strip() or new_name_input.strip() == old_name: return
         clean_new_name = new_name_input.strip() # Garante que o novo nome não é apenas espaços em branco
         if clean_new_name in self.get_all_func():
-            messagebox.showwarning("Duplicado", f"O nome '{clean_new_name}' já existe.", parent=self)
+            CTkMessagebox(title="Duplicado", message=f"O nome '{clean_new_name}' já existe.", icon="warning")
             return
         success, error_message = self.update_func(old_name, clean_new_name)
         if not success:
-            messagebox.showerror("Erro ao Atualizar", f"Não foi possível atualizar o {self.item_name_singular}.\n\nMotivo: {error_message}", parent=self)
+            CTkMessagebox(title="Erro ao Atualizar", message=f"Não foi possível atualizar o {self.item_name_singular}.\n\nMotivo: {error_message}", icon="error")
             return
         self.load_and_display_items()
         self.refresh_master_func()
         self.master.update_status(f"{self.item_name_singular.capitalize()} '{old_name}' atualizado para '{clean_new_name}'.")
 
     def delete_item(self, name_to_delete):
-        if messagebox.askyesno("Confirmar Exclusão", f"Tem certeza que deseja excluir o {self.item_name_singular} '{name_to_delete}'?", parent=self):
+        msg = CTkMessagebox(title="Confirmar Exclusão", message=f"Tem certeza que deseja excluir o {self.item_name_singular} '{name_to_delete}'?", icon="question", option_1="Não", option_2="Sim")
+        if msg.get() == "Sim":
             success, error_message = self.delete_func(name_to_delete)
             if success:
-                self.master.update_status(f"{self.item_name_singular.capitalize()} '{name_to_delete}' excluído com sucesso.")
+                self.master.update_status(f"{self.item_name_singular.capitalize()} '{name_to_delete}' concluído com sucesso.")
             else:
-                messagebox.showerror("Erro ao Excluir", f"Não foi possível excluir o {self.item_name_singular} '{name_to_delete}'.\n\nMotivo: {error_message}", parent=self)
+                CTkMessagebox(title="Erro ao Excluir", message=f"Não foi possível excluir o {self.item_name_singular} '{name_to_delete}'.\n\nMotivo: {error_message}", icon="error")
             self.load_and_display_items()
             self.refresh_master_func()
 
@@ -421,7 +360,7 @@ class InventoryApp(ctk.CTk):
         success, error_message = self.db_manager.connect()
         if not success:
             self.withdraw() # Esconde a janela principal antes de mostrar o erro
-            messagebox.showerror("Erro Crítico de Banco de Dados", f"Não foi possível iniciar o banco de dados.\n\nArquivo: estoque.db\nErro: {error_message}\n\nO aplicativo será encerrado.")
+            CTkMessagebox(title="Erro Crítico de Banco de Dados", message=f"Não foi possível iniciar o banco de dados.\n\nArquivo: estoque.db\nErro: {error_message}\n\nO aplicativo será encerrado.", icon="error")
             self.after(100, self.destroy) # Fecha o app após mostrar a msg
             return
         
@@ -437,11 +376,22 @@ class InventoryApp(ctk.CTk):
         main_frame = ctk.CTkFrame(self)
         main_frame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
-        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_rowconfigure(3, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
+        # MINI-DASHBOARD
+        dash_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        dash_frame.grid(row=0, column=0, pady=5, padx=10, sticky="ew")
+        dash_frame.grid_columnconfigure((0, 1), weight=1)
+        
+        self.dash_total_lbl = ctk.CTkLabel(dash_frame, text="Produtos Cadastrados: -", font=("Arial", 14, "bold"))
+        self.dash_total_lbl.grid(row=0, column=0, sticky="w")
+        self.dash_conferentes_lbl = ctk.CTkLabel(dash_frame, text="Conferentes: -", font=("Arial", 14, "bold"))
+        self.dash_conferentes_lbl.grid(row=0, column=1, sticky="w")
+        self._update_dashboard()
+
         header_frame = ctk.CTkFrame(main_frame)
-        header_frame.grid(row=0, column=0, pady=10, padx=10, sticky="ew")
+        header_frame.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
         header_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(header_frame, text="Nome do Conferente:", font=("Arial", 14)).grid(row=0, column=0, padx=(10, 5), pady=5)
         conferentes = self.db_manager.get_all_conferentes()
@@ -449,13 +399,23 @@ class InventoryApp(ctk.CTk):
         self.conferente_entry.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="ew")
         self.conferente_entry.set("")
 
+        # SEARCH BAR
+        search_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        search_frame.grid(row=2, column=0, pady=5, padx=10, sticky="ew")
+        search_frame.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(search_frame, text="Buscar Produto:").grid(row=0, column=0, padx=(0, 5), sticky="w")
+        self.search_product_var = ctk.StringVar()
+        self.search_product_var.trace_add("write", self.filter_products)
+        search_entry = ctk.CTkEntry(search_frame, textvariable=self.search_product_var, placeholder_text="Digite o nome...")
+        search_entry.grid(row=0, column=1, sticky="ew")
+
         self.scrollable_frame = ctk.CTkScrollableFrame(main_frame, label_text="Lista de Produtos")
-        self.scrollable_frame.grid(row=1, column=0, pady=10, padx=10, sticky="nsew")
+        self.scrollable_frame.grid(row=3, column=0, pady=10, padx=10, sticky="nsew")
 
         self.load_and_display_products()
 
         manage_frame = ctk.CTkFrame(main_frame)
-        manage_frame.grid(row=2, column=0, pady=5, padx=10, sticky="ew")
+        manage_frame.grid(row=4, column=0, pady=5, padx=10, sticky="ew")
         manage_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
         manage_product_button = ctk.CTkButton(manage_frame, text="Gerenciar Produtos", command=self.open_product_manager)
@@ -467,10 +427,10 @@ class InventoryApp(ctk.CTk):
         search_button.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
 
         self.overwrite_checkbox = ctk.CTkCheckBox(main_frame, text="Sobrescrever contagens existentes no mesmo dia")
-        self.overwrite_checkbox.grid(row=3, column=0, pady=(10, 0), padx=10, sticky="w")
+        self.overwrite_checkbox.grid(row=5, column=0, pady=(10, 0), padx=10, sticky="w")
 
         self.export_button = ctk.CTkButton(main_frame, text="Salvar Conferência", command=self.finish_and_export, height=40, font=("Arial", 16, "bold"))
-        self.export_button.grid(row=4, column=0, pady=15, padx=10, sticky="ew")
+        self.export_button.grid(row=6, column=0, pady=15, padx=10, sticky="ew")
 
         self.status_label = ctk.CTkLabel(self, text="Pronto", anchor="w", font=("Arial", 12))
         self.status_label.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
@@ -495,16 +455,34 @@ class InventoryApp(ctk.CTk):
         self.product_widgets = {}
 
         products = self.db_manager.get_all_products()
+        self.all_products = products # Para filtrar
         
         for product_name in products:
             self.create_product_entry_widget(product_name)
+        
+        self._update_dashboard()
+
+    def _update_dashboard(self):
+        try:
+            total_prod = len(self.db_manager.get_all_products())
+            total_conf = len(self.db_manager.get_all_conferentes())
+            if hasattr(self, 'dash_total_lbl'):
+                self.dash_total_lbl.configure(text=f"Produtos Cadastrados: {total_prod}")
+                self.dash_conferentes_lbl.configure(text=f"Conferentes: {total_conf}")
+        except:
+            pass
+
+    def filter_products(self, *args):
+        search_text = self.search_product_var.get().lower()
+        for product_name, widgets in self.product_widgets.items():
+            if search_text in product_name.lower():
+                widgets['frame'].pack(fill="x", pady=2, padx=5)
+            else:
+                widgets['frame'].pack_forget()
 
     def create_product_entry_widget(self, product_name):
         product_frame = ctk.CTkFrame(self.scrollable_frame)
         product_frame.pack(fill="x", pady=2, padx=5)
-
-        checkbox = ctk.CTkCheckBox(product_frame, text="")
-        checkbox.pack(side="left", padx=5)
 
         label = ctk.CTkLabel(product_frame, text=product_name, anchor="w")
         label.pack(side="left", fill="x", expand=True, padx=10)
@@ -512,8 +490,11 @@ class InventoryApp(ctk.CTk):
         vcmd = (self.register(self.validate_integer_input), '%P')
         entry = ctk.CTkEntry(product_frame, width=80, justify="center", validate="key", validatecommand=vcmd)
         entry.pack(side="right", padx=10)
+        
+        # Shortcut de enter
+        entry.bind("<Return>", lambda e: self.finish_and_export())
 
-        self.product_widgets[product_name] = {'frame': product_frame, 'checkbox': checkbox, 'entry': entry}
+        self.product_widgets[product_name] = {'frame': product_frame, 'entry': entry}
 
     def validate_integer_input(self, P):
         return P.isdigit() or P == ""
@@ -526,19 +507,15 @@ class InventoryApp(ctk.CTk):
     def finish_and_export(self):
         conferente = self.conferente_entry.get()
         if not conferente:
-            messagebox.showerror("Erro de Validação", "O campo 'Nome do Conferente' não pode estar vazio.")
+            CTkMessagebox(title="Erro de Validação", message="O campo 'Nome do Conferente' não pode estar vazio.", icon="warning")
             self.update_status("Salvamento cancelado: Nome do conferente é obrigatório.", 5000)
             return
 
         export_data = []
         
         for product_name, widgets in self.product_widgets.items():
-            # Apenas processa os itens que foram marcados com o checkbox
-            if widgets['checkbox'].get() == 1:
-                quantity = widgets['entry'].get()
-                if not quantity:
-                    quantity = "0"
-                
+            quantity = widgets['entry'].get()
+            if quantity: # Se digitou algo, ele tenta salvar
                 try:
                     export_data.append({
                         'Conferente': conferente,
@@ -547,11 +524,11 @@ class InventoryApp(ctk.CTk):
                     })
                 except ValueError:
                     # Este erro é improvável com a validação de entrada, mas é uma boa prática mantê-lo.
-                    messagebox.showerror("Erro de Dados", f"Valor inválido para quantidade no produto '{product_name}'. Use apenas números.")
+                    CTkMessagebox(title="Erro de Dados", message=f"Valor inválido para quantidade no produto '{product_name}'. Use apenas números.", icon="error")
                     return
 
         if not export_data:
-            messagebox.showwarning("Nenhum Dado", "Nenhum produto foi marcado para salvar. Marque a caixa de seleção ao lado dos itens contados.")
+            CTkMessagebox(title="Nenhum Dado", message="Nenhum produto foi preenchido. Digite as quantidades ao lado dos itens contados.", icon="warning")
             self.update_status("Salvamento cancelado: Nenhum produto marcado.", 5000)
             return
 
@@ -583,7 +560,7 @@ class InventoryApp(ctk.CTk):
             if not success:
                 raise Exception(error_message)
         except Exception as e:
-            messagebox.showerror("Erro ao Salvar", f"Ocorreu um erro ao salvar no banco de dados:\n{e}\n\nA operação foi revertida e nenhum dado foi salvo.")
+            CTkMessagebox(title="Erro ao Salvar", message=f"Ocorreu um erro ao salvar no banco de dados:\n{e}\n\nA operação foi revertida e nenhum dado foi salvo.", icon="error")
             self.update_status("Falha ao salvar. Dados não foram salvos.", 5000)
             # Reabilita o botão em caso de erro
             self.export_button.configure(state="normal", text="Salvar Conferência")
@@ -591,13 +568,12 @@ class InventoryApp(ctk.CTk):
 
         # Limpa os campos dos itens que foram salvos
         for product_name, widgets in self.product_widgets.items():
-            if widgets['checkbox'].get() == 1: # Se estava marcado
+            if widgets['entry'].get(): # Se estava preenchido, reseta
                 widgets['entry'].delete(0, 'end')
-                widgets['checkbox'].deselect()
 
         # Reabilita o botão
         self.export_button.configure(state="normal", text="Salvar Conferência")
-        messagebox.showinfo("Sucesso", "Dados da conferência salvos com sucesso no banco de dados.")
+        CTkMessagebox(title="Sucesso", message="Dados da conferência salvos com sucesso no banco de dados.", icon="check")
         self.update_status("Conferência salva com sucesso.")
 
     def refresh_conferente_combobox(self):
