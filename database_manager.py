@@ -102,6 +102,10 @@ class DatabaseManager:
                 # (ou None se não, como em INSERT IGNORE para duplicatas).
                 return True, (cursor.lastrowid if "INSERT" in query.upper() else None)
         except sqlite3.Error as e:
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
             error_str = str(e)
             print(f"Erro ao executar query: {error_str}")
             self.connection.rollback()
@@ -114,6 +118,14 @@ class DatabaseManager:
             if "NOT NULL constraint failed" in error_str:
                 return False, f"Um campo obrigatório não foi preenchido: {error_str.split(': ')[-1]}."
             return False, error_str # Retorna o erro original se não for um dos casos conhecidos
+<<<<<<< HEAD
+=======
+=======
+            print(f"Erro ao executar query: {e}")
+            self.connection.rollback()
+            return False, str(e)
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
         finally:
             cursor.close()
 
@@ -123,6 +135,10 @@ class DatabaseManager:
         return [row['name'] for row in results] if success and results else []
 
     def add_product(self, product_name):
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
         success, result = self.execute_query("INSERT INTO products (name) VALUES (?)", (product_name,))
         if success and result is not None:
             return True, None
@@ -133,6 +149,21 @@ class DatabaseManager:
 
     def delete_product(self, product_name):
         return self.execute_query("DELETE FROM products WHERE name = ?", (product_name,))
+<<<<<<< HEAD
+=======
+=======
+        success, lastrowid = self.execute_query("INSERT INTO products (name) VALUES (?)", (product_name,))
+        return success and lastrowid is not None # Retorna True apenas se a query for bem-sucedida E um novo ID foi gerado
+
+    def update_product(self, old_name, new_name):
+        success, _ = self.execute_query("UPDATE products SET name = ? WHERE name = ?", (new_name, old_name))
+        return success
+
+    def delete_product(self, product_name):
+        success, _ = self.execute_query("DELETE FROM products WHERE name = ?", (product_name,))
+        return success
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
 
     def get_product_id(self, product_name):
         success, result = self.execute_query("SELECT id FROM products WHERE name = ?", (product_name,), fetch=True)
@@ -144,6 +175,10 @@ class DatabaseManager:
         return [row['name'] for row in results] if success and results else []
 
     def add_conferente(self, conferente_name):
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
         success, result = self.execute_query("INSERT INTO conferentes (name) VALUES (?)", (conferente_name,))
         if success and result is not None:
             return True, None
@@ -154,6 +189,21 @@ class DatabaseManager:
 
     def delete_conferente(self, conferente_name):
         return self.execute_query("DELETE FROM conferentes WHERE name = ?", (conferente_name,))
+<<<<<<< HEAD
+=======
+=======
+        success, lastrowid = self.execute_query("INSERT INTO conferentes (name) VALUES (?)", (conferente_name,))
+        return success and lastrowid is not None
+
+    def update_conferente(self, old_name, new_name):
+        success, _ = self.execute_query("UPDATE conferentes SET name = ? WHERE name = ?", (new_name, old_name))
+        return success
+
+    def delete_conferente(self, conferente_name):
+        success, _ = self.execute_query("DELETE FROM conferentes WHERE name = ?", (conferente_name,))
+        return success
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
 
     def get_conferente_id(self, conferente_name):
         success, result = self.execute_query("SELECT id FROM conferentes WHERE name = ?", (conferente_name,), fetch=True)
@@ -338,14 +388,30 @@ class DatabaseManager:
         # Adiciona produtos padrão
         default_products = ['Teclado Mecanico', 'Mouse Optico', 'Monitor 24pol', 'Cabo HDMI 2m', 'Switch 8 Portas']
         for product_name in default_products:
+<<<<<<< HEAD
             success, _ = self.add_product(product_name)
+=======
+<<<<<<< HEAD
+            success, _ = self.add_product(product_name)
+=======
+            success = self.add_product(product_name)
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
             if success:
                 print(f"Adicionado produto padrão: {product_name}")
 
         # Adiciona conferente padrão
         default_conferentes = ['Admin']
         for conferente_name in default_conferentes:
+<<<<<<< HEAD
             success, _ = self.add_conferente(conferente_name)
+=======
+<<<<<<< HEAD
+            success, _ = self.add_conferente(conferente_name)
+=======
+            success = self.add_conferente(conferente_name)
+>>>>>>> bb3728385c64ebfc94f8708c835c62f5ee560ad8
+>>>>>>> da84a72eaae0988189b64c5e29cde514102e92e5
             if success:
                 print(f"Adicionado conferente padrão: {conferente_name}")
 
