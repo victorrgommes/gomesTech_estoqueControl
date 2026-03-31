@@ -339,6 +339,7 @@ class DatabaseManager:
         default_products = ['Teclado Mecanico', 'Mouse Optico', 'Monitor 24pol', 'Cabo HDMI 2m', 'Switch 8 Portas']
         for product_name in default_products:
             success, _ = self.add_product(product_name)
+
             if success:
                 print(f"Adicionado produto padrão: {product_name}")
 
@@ -346,6 +347,7 @@ class DatabaseManager:
         default_conferentes = ['Admin']
         for conferente_name in default_conferentes:
             success, _ = self.add_conferente(conferente_name)
+
             if success:
                 print(f"Adicionado conferente padrão: {conferente_name}")
 
