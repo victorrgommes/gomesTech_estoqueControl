@@ -74,7 +74,9 @@ class SearchWindow(ctk.CTkToplevel):
     def _clear_search_results(self):
         """Limpa os resultados da Tabela e desabilita o botão de edição."""
         self.table_values = [["ID", "Data/Hora", "Conferente", "Produto", "Quantidade"]]
-        self.table.update_values(self.table_values)
+        self.table.destroy()
+        self.table = CTkTable(master=self.table_frame, values=self.table_values, command=self.on_table_click)
+        self.table.pack(expand=True, fill="both")
         self.edit_button.configure(state="disabled")
         self.last_search_results = []
         self.selected_row = None
@@ -127,7 +129,9 @@ class SearchWindow(ctk.CTkToplevel):
             for row in results:
                 dt_str = row['entry_datetime'].strftime('%d/%m/%Y %H:%M:%S')
                 self.table_values.append([row['id'], dt_str, row['conferente_name'], row['product_name'], str(row['quantity'])])
-            self.table.update_values(self.table_values)
+            self.table.destroy()
+            self.table = CTkTable(master=self.table_frame, values=self.table_values, command=self.on_table_click)
+            self.table.pack(expand=True, fill="both")
             self.last_search_results = results
 
         except Exception as e:
